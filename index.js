@@ -13,8 +13,12 @@ const uuid = require('uuid')
 const fs = require('fs')
 const path = require('path');
 
+// bucket you want the files to be uploaded
 var bucket = process.argv[2]
+// folder from which you want to sync files
 var folder = process.argv[3]
+
+
 // Set the region 
 AWS.config.update( { region: 'ap-southeast-2' } );
 
@@ -32,7 +36,7 @@ fs.readdir( folder, { encoding: 'utf-8', withFileTypes: true}, (err, files) => {
 
     files.forEach( function(dirent){
         // double check that it is a file
-       if( dirent.isFile() ){ 
+       if( dirent.isFile() ){
             console.log(dirent.name)
        }
     })
