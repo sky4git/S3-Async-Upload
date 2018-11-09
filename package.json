@@ -1,0 +1,21 @@
+{
+  "name": "s3-async-upload",
+  "version": "1.0.0",
+  "description": "Multi-part upload for Amazon S3 file upload",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "run": "AWS_ACCESS_KEY_ID=access_key AWS_SECRET_ACCESS_KEY=secret_key node index mybucket "C:\Users\Default\Desktop\MyFolder"
+  },
+  "keywords": [
+    "multipart",
+    "amazon",
+    "s3"
+  ],
+  "author": "Aakash D",
+  "license": "MIT",
+  "dependencies": {
+    "aws-sdk": "^2.350.0",
+    "uuid": "^3.3.2"
+  }
+}
