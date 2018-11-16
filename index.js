@@ -27,6 +27,7 @@ var s3 = new AWS.S3( { apiVersion: '2006-03-01' } );
 
 console.log('BUCKET = '+bucket)
 console.log('DIRECTORY = '+ folder)
+
 // console.log(s3)
 
 // loop through the directory
@@ -41,14 +42,46 @@ fs.readdir( folder, { encoding: 'utf-8', withFileTypes: true}, (err, files) => {
           if( path.extname(dirent.name) === ext || ext === '.' ){
                console.log(dirent.name)
                // do fileupload
-               doUpload( folder+"/"+dirent.name )
+               //doUpload( folder+"/"+dirent.name )
           }
        }
     })
 
-})
+});
 
-function doUpload( filepath ){
+/**
+ * Get multipart upload ID with starintg multipart upload
+ * @param {string} filepath 
+ */
+function createMultiPartUpload( filepath ){
+     var params = {
+        Bucket: bucket, // put
+        Key: "largeobject",
+        ACL: "private",
+        ServerSideEncryption: 'AES256'
+   };
+   s3.createMultipartUpload( params, function( err, data ) {
+     if (err) console.log(err, err.stack); // an error occurred
+     else {
+          console.log(data);           // successful response
+          // create streams
+     }    createStreams( filepath, UploadId );
+     /*
+     data = {
+          Bucket: "examplebucket", 
+          Key: "largeobject", 
+          UploadId: "ibZBv_75gd9r8lH_gqXatLdxMVpAlj6ZQjEs.OwyF3953YdwbcQnMA2BLGn8Lx12fQNICtMw5KyteFeHw.Sjng--"
+     }
+     */
+   });
+}
+
+/**
+ * Create stream for each file
+ * @param {string} filepath 
+ * @param {string} UploadId 
+ */
+function createStreams( filepath, UploadId ){
      const stream = fs.createReadStream( filepath );
      /* setTimeout(() => {
           stream.close(); // This may not close the stream.
@@ -61,11 +94,14 @@ function doUpload( filepath ){
           stream.read(0);
      }, 100); */
      stream.on('data', (chunk) => {
-          console.log(`Received ${chunk.length} bytes of data for `+filepath);
+          console.log( 'Received ${chunk.length} bytes of data for '+filepath );
+          // do multipart upload
+          doMultiPartUpload( chunk, UploadId );
      });
 
      stream.on('end', () => {
           console.log('End stream: '+filepath);
+
      });
 
      stream.on('close', () => {
@@ -75,24 +111,40 @@ function doUpload( filepath ){
      stream.on('error', () => {
           console.log('Error on: '+filepath);
      });
+}//end func
+
+/**
+ * Do multipart upload
+ * @param {binary} data 
+ * @param {string} UploadId 
+ */
+function doMultiPartUpload( data, uploadId ){
+
+}// end func
+
+/**
+ * finish multipart upload
+ * @param {string} params 
+ * @param {string} params 
+ */
+function finishMultiPartUpload( params, uploadId) {
+     var params = {
+          Bucket: bucket, 
+          Key: "largeobject", 
+           
+          UploadId: ""
+         };
+         s3.completeMultipartUpload(params, function(err, data) {
+           if (err) console.log(err, err.stack); // an error occurred
+           else     console.log(data);           // successful response
+           /*
+           data = {
+            Bucket: "acexamplebucket", 
+            ETag: "\"4d9031c7644d8081c2829f4ea23c55f7-2\"", 
+            Key: "bigobject", 
+            Location: "https://examplebucket.s3.amazonaws.com/bigobject"
+           }
+           */
+         });
 }
 
-
-/* The following example initiates a multipart upload. */
-/*var params = {
-        Bucket: bucket, // put
-        Key: "largeobject",
-        ACL: "private",
-        ServerSideEncryption: 'AES256'
-   };
-   s3.createMultipartUpload( params, function( err, data ) {
-     if (err) console.log(err, err.stack); // an error occurred
-     else     console.log(data);           // successful response
-     /*
-     data = {
-          Bucket: "examplebucket", 
-          Key: "largeobject", 
-          UploadId: "ibZBv_75gd9r8lH_gqXatLdxMVpAlj6ZQjEs.OwyF3953YdwbcQnMA2BLGn8Lx12fQNICtMw5KyteFeHw.Sjng--"
-     }
-     */
-//});
