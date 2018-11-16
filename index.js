@@ -17,7 +17,7 @@ const path = require('path');
 var bucket = process.argv[2]
 // folder from which you want to sync files
 var folder = process.argv[3]
-
+var ext = '.' + process.argv[4]
 
 // Set the region 
 AWS.config.update( { region: 'ap-southeast-2' } );
@@ -37,26 +37,62 @@ fs.readdir( folder, { encoding: 'utf-8', withFileTypes: true}, (err, files) => {
     files.forEach( function(dirent){
         // double check that it is a file
        if( dirent.isFile() ){
-            console.log(dirent.name)
+          // check the extension param 
+          if( path.extname(dirent.name) === ext || ext === '.' ){
+               console.log(dirent.name)
+               // do fileupload
+               doUpload( folder+"/"+dirent.name )
+          }
        }
     })
 
 })
 
+function doUpload( filepath ){
+     const stream = fs.createReadStream( filepath );
+     /* setTimeout(() => {
+          stream.close(); // This may not close the stream.
+          // Artificially marking end-of-stream, as if the underlying resource had
+          // indicated end-of-file by itself, allows the stream to close.
+          // This does not cancel pending read operations, and if there is such an
+          // operation, the process may still not be able to exit successfully
+          // until it finishes.
+          stream.push(null);
+          stream.read(0);
+     }, 100); */
+     stream.on('data', (chunk) => {
+          console.log(`Received ${chunk.length} bytes of data for `+filepath);
+     });
+
+     stream.on('end', () => {
+          console.log('End stream: '+filepath);
+     });
+
+     stream.on('close', () => {
+          console.log('Close stream: '+filepath);
+     });
+
+     stream.on('error', () => {
+          console.log('Error on: '+filepath);
+     });
+}
+
 
 /* The following example initiates a multipart upload. */
 /*var params = {
         Bucket: bucket, // put
-        Key: "largeobject"
+        Key: "largeobject",
+        ACL: "private",
+        ServerSideEncryption: 'AES256'
    };
-   s3.createMultipartUpload(params, function(err, data) {
+   s3.createMultipartUpload( params, function( err, data ) {
      if (err) console.log(err, err.stack); // an error occurred
      else     console.log(data);           // successful response
      /*
      data = {
-      Bucket: "examplebucket", 
-      Key: "largeobject", 
-      UploadId: "ibZBv_75gd9r8lH_gqXatLdxMVpAlj6ZQjEs.OwyF3953YdwbcQnMA2BLGn8Lx12fQNICtMw5KyteFeHw.Sjng--"
+          Bucket: "examplebucket", 
+          Key: "largeobject", 
+          UploadId: "ibZBv_75gd9r8lH_gqXatLdxMVpAlj6ZQjEs.OwyF3953YdwbcQnMA2BLGn8Lx12fQNICtMw5KyteFeHw.Sjng--"
      }
      */
 //});
