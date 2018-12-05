@@ -41,8 +41,8 @@ fs.readdir( folder, { encoding: 'utf-8', withFileTypes: true}, (err, files) => {
           // check the extension param 
           if( path.extname(dirent.name) === ext || ext === '.' ){
                console.log(dirent.name)
-               // do fileupload
-               //doUpload( folder+"/"+dirent.name )
+               // create multipart fileupload
+              createMultiPartUpload( folder+"/"+dirent.name );
           }
        }
     })
@@ -54,9 +54,9 @@ fs.readdir( folder, { encoding: 'utf-8', withFileTypes: true}, (err, files) => {
  * @param {string} filepath 
  */
 function createMultiPartUpload( filepath ){
-     var params = {
+   var params = {
         Bucket: bucket, // put
-        Key: "largeobject",
+        Key: "largeobject", // need to put uuid here
         ACL: "private",
         ServerSideEncryption: 'AES256'
    };
@@ -65,7 +65,7 @@ function createMultiPartUpload( filepath ){
      else {
           console.log(data);           // successful response
           // create streams
-     }    createStreams( filepath, UploadId );
+     }    createStreams( filepath, uploadPartData );
      /*
      data = {
           Bucket: "examplebucket", 
@@ -79,9 +79,9 @@ function createMultiPartUpload( filepath ){
 /**
  * Create stream for each file
  * @param {string} filepath 
- * @param {string} UploadId 
+ * @param {object} uploadPartData
  */
-function createStreams( filepath, UploadId ){
+function createStreams( filepath, uploadPartData ){
      const stream = fs.createReadStream( filepath );
      /* setTimeout(() => {
           stream.close(); // This may not close the stream.
@@ -93,15 +93,20 @@ function createStreams( filepath, UploadId ){
           stream.push(null);
           stream.read(0);
      }, 100); */
+     var partNumber = 1;
      stream.on('data', (chunk) => {
-          console.log( 'Received ${chunk.length} bytes of data for '+filepath );
+
+          console.log( partNumber + ': Received '+ chunk.length + ' bytes of data for :'+ filepath );
+          // add part Number in to the object
+          uploadPartData.partNumber = partNumber;
           // do multipart upload
-          doMultiPartUpload( chunk, UploadId );
+          doMultiPartUpload( chunk, uploadPartData, chunk );
+          // increase the Number
+          partNumber++;
      });
 
      stream.on('end', () => {
           console.log('End stream: '+filepath);
-
      });
 
      stream.on('close', () => {
@@ -117,9 +122,26 @@ function createStreams( filepath, UploadId ){
  * Do multipart upload
  * @param {binary} data 
  * @param {string} UploadId 
+ * @param {number} partCount
  */
-function doMultiPartUpload( data, uploadId ){
-
+function doMultiPartUpload( data, uploadPartData, chunk ){
+     console.log( 'partNumber:' + uploadPartData.partNumber );
+     var params = {
+          Body: chunk, 
+          Bucket: bucket, 
+          Key: uploadPartData.Key, 
+          PartNumber: uploadPartData.partNumber, 
+          UploadId: uploadId
+         };
+         s3.uploadPart(params, function(err, data) {
+           if (err) console.log(err, err.stack); // an error occurred
+           else     console.log(data);           // successful response
+           /*
+           data = {
+            ETag: "\"d8c2eafd90c266e19ab9dcacc479f8af\""
+           }
+           */
+         });
 }// end func
 
 /**
