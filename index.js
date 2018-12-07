@@ -54,19 +54,23 @@ fs.readdir( folder, { encoding: 'utf-8', withFileTypes: true}, (err, files) => {
  * @param {string} filepath 
  */
 function createMultiPartUpload( filepath ){
+   //set params
    var params = {
         Bucket: bucket, // put
         Key: "largeobject", // need to put uuid here
-        ACL: "private",
+      //  ACL: "private",
         ServerSideEncryption: 'AES256'
    };
+   // create multipart upload
    s3.createMultipartUpload( params, function( err, data ) {
-     if (err) console.log(err, err.stack); // an error occurred
-     else {
-          console.log(data);           // successful response
+     if (err){ console.log('ERROR'); console.log( err, err.stack ); // an error occurred
+     } else {
+          console.log( data );           // successful response
           // create streams
-     }    createStreams( filepath, uploadPartData );
-     /*
+     }    createStreams( filepath, data );
+     /**
+      * data object eample 
+      *
      data = {
           Bucket: "examplebucket", 
           Key: "largeobject", 
@@ -82,66 +86,68 @@ function createMultiPartUpload( filepath ){
  * @param {object} uploadPartData
  */
 function createStreams( filepath, uploadPartData ){
+     // set stream object
      const stream = fs.createReadStream( filepath );
-     /* setTimeout(() => {
-          stream.close(); // This may not close the stream.
-          // Artificially marking end-of-stream, as if the underlying resource had
-          // indicated end-of-file by itself, allows the stream to close.
-          // This does not cancel pending read operations, and if there is such an
-          // operation, the process may still not be able to exit successfully
-          // until it finishes.
-          stream.push(null);
-          stream.read(0);
-     }, 100); */
+     // data collector array
+     var dataCollector = [];
+     // start with part number 1
      var partNumber = 1;
+     // on data event
      stream.on('data', (chunk) => {
-
           console.log( partNumber + ': Received '+ chunk.length + ' bytes of data for :'+ filepath );
-          // add part Number in to the object
-          uploadPartData.partNumber = partNumber;
-          // do multipart upload
-          doMultiPartUpload( chunk, uploadPartData, chunk );
+          // push to dataCollector
+          dataCollector.push( [partNumber, chunk ] );
           // increase the Number
           partNumber++;
      });
-
+     // on end
      stream.on('end', () => {
-          console.log('End stream: '+filepath);
+          console.log( 'End stream: '+filepath );
+          console.log(dataCollector);
+          // do multipart upload
+          doMultiPartUpload( dataCollector );
      });
-
+     // on close
      stream.on('close', () => {
-          console.log('Close stream: '+filepath);
+          console.log( 'Close stream: '+filepath );
      });
-
+     // on error
      stream.on('error', () => {
-          console.log('Error on: '+filepath);
+          console.log( 'Error on: '+filepath );
      });
 }//end func
 
 /**
  * Do multipart upload
- * @param {binary} data 
- * @param {string} UploadId 
- * @param {number} partCount
+ * @param {array} dataCollector collection of chunks
  */
-function doMultiPartUpload( data, uploadPartData, chunk ){
-     console.log( 'partNumber:' + uploadPartData.partNumber );
+function doMultiPartUpload( dataCollector ){
+     
+     // set params
      var params = {
           Body: chunk, 
           Bucket: bucket, 
           Key: uploadPartData.Key, 
-          PartNumber: uploadPartData.partNumber, 
-          UploadId: uploadId
-         };
-         s3.uploadPart(params, function(err, data) {
-           if (err) console.log(err, err.stack); // an error occurred
-           else     console.log(data);           // successful response
-           /*
+          PartNumber: uploadPartData.PartNumber, 
+          UploadId: uploadPartData.UploadId
+     };
+    
+     // upload part
+     s3.uploadPart( params, function( err, data ) {
+           if (err) console.log( err, err.stack ); // an error occurred
+           else {   
+                data.PartNumber = params.PartNumber; 
+                console.log( data );
+                return data;
+           } // successful response
+           /**
+            * data object example 
+            *
            data = {
             ETag: "\"d8c2eafd90c266e19ab9dcacc479f8af\""
            }
            */
-         });
+     });
 }// end func
 
 /**
@@ -149,11 +155,22 @@ function doMultiPartUpload( data, uploadPartData, chunk ){
  * @param {string} params 
  * @param {string} params 
  */
-function finishMultiPartUpload( params, uploadId) {
+function finishMultiPartUpload( params, uploadId ) {
      var params = {
           Bucket: bucket, 
           Key: "largeobject", 
-           
+          MultipartUpload: {
+               Parts: [
+                  {
+                 ETag: "\"d8c2eafd90c266e19ab9dcacc479f8af\"", 
+                 PartNumber: 1
+                }, 
+                  {
+                 ETag: "\"d8c2eafd90c266e19ab9dcacc479f8af\"", 
+                 PartNumber: 2
+                }
+               ]
+          },  
           UploadId: ""
          };
          s3.completeMultipartUpload(params, function(err, data) {
