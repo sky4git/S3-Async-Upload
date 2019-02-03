@@ -3,7 +3,7 @@
 *  AWS_SECRET_ACCESS_KEY = <YOUR SECRET ACCESS KEY>
 *  AWS_SESSION_TOKEN (optional)
 *  Run this file with following command
-*  AWS_ACCESS_KEY_ID = <your_access_key_id> AWS_SECRET_ACCESS_KEY = <your_secret_access_key> node index.js YOUR_BUCKET_NAME YOUR_FOLDER_NAME
+*  AWS_ACCESS_KEY_ID = <your_access_key_id> AWS_SECRET_ACCESS_KEY = <your_secret_access_key> node index.js YOUR_BUCKET_NAME YOUR_FOLDER_NAME STORAGE_CLASS
 *
 *  @ref: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html
 */
@@ -21,6 +21,9 @@ var bucket = process.argv[2]
 var folder = process.argv[3]
 var ext = '.' + process.argv[4]
 
+// set storage class
+var StorageClass = process.argv[5];
+
 // set empty total parts collector object
 var totalPartsCollector = {};
 // set empty data collector array
@@ -37,7 +40,9 @@ console.log('DIRECTORY = '+ folder)
 
 s3.listObjectsV2({ MaxKeys: 10, Bucket: bucket }, function(err, data) {
      if (err) console.log(err, err.stack); // an error occurred
-     else     console.log(data);           // successful response
+     else{
+          //console.log(data);           // successful response
+     }
 });
 // console.log(s3)
 
@@ -54,7 +59,7 @@ fs.readdir( folder, { encoding: 'utf-8', withFileTypes: true}, (err, files) => {
               //console.log(folder + "/" +dirent.name)
                
               fs.stat( folder + "/" +dirent.name, function(err, stats,) {
-                    console.log("fs.stats file size  : " + stats.size )
+                    //console.log("fs.stats file size  : " + stats.size )
                     // if file size is less than 5mb
                     if( stats.size < 5000000 ){
                          fs.readFile( folder+"/"+dirent.name, (err, data) => {
@@ -82,11 +87,15 @@ function uploadFile( filedata, filename ){
      var params = {
           Body: filedata, 
           Bucket: bucket, 
-          Key: filename
+          Key: filename,
+          StorageClass: StorageClass
      };
      s3.putObject(params, function(err, data) {
           if (err) console.log(err, err.stack); // an error occurred
-          else     console.log(data);           // successful response
+          else{
+               //console.log(data);           // successful response
+               console.log(filename + " uploaded succesfully");
+          }
           /*
           data = {
           ETag: "\"6805f2cfc46c0f04559748bb039d69ae\"", 
@@ -107,13 +116,14 @@ function createMultiPartUpload( filepath, filename ){
         Bucket: bucket, // put
         Key: filename, // filename is the key
       //  ACL: "private",
-        ServerSideEncryption: 'AES256'
+        ServerSideEncryption: 'AES256',
+        StorageClass: StorageClass
    };
    // create multipart upload
    s3.createMultipartUpload( params, function( err, data ) {
      if (err){ console.log('ERROR'); console.log( err, err.stack ); // an error occurred
      } else {
-          console.log( data );           // successful response
+          //console.log( data );           // successful response
           // add uploadID to data collector AssociativeArray
           dataCollectorArr.push( data.UploadId, { value: [] } )
           // create streams
@@ -142,7 +152,7 @@ function createStreams( filepath, uploadPartData ){
      var partNumber = 1;
      // on data event
      stream.on('data', (chunk) => {
-          console.log( partNumber + ': Received '+ chunk.length + ' bytes of data for :'+ filepath );
+          //console.log( partNumber + ': Received '+ chunk.length + ' bytes of data for :'+ filepath );
           // add to upload part data object
           uploadPartData.chunk = chunk;
           uploadPartData.partNumber = partNumber;
@@ -153,8 +163,8 @@ function createStreams( filepath, uploadPartData ){
      })
      // on end
      stream.on('end', () => {
-          console.log( 'End stream: '+ filepath );
-          console.log( 'total parts:'+ (partNumber -1) );
+          //console.log( 'End stream: '+ filepath );
+          //console.log( 'total parts:'+ (partNumber -1) );
           // emit setTotalPartsNumber event
           customEmitter.emit( 'setTotalPartsNumber', ( partNumber - 1 ), uploadPartData.UploadId );
      })
@@ -214,7 +224,7 @@ function doMultiPartUpload( uploadPartData ){
  * @param {string} uploadId uploadID of the object
  */
 customEmitter.on( 'setTotalPartsNumber', ( totalPartsNumber, uploadId ) => {
-     console.log( 'set Total Parts occurred!' );
+     //console.log( 'set Total Parts occurred!' );
      // set array values
      totalPartsCollector[uploadId] = totalPartsNumber   
 });
@@ -271,10 +281,13 @@ function finishMultiPartUpload( dataObj ) {
           },  
           UploadId: dataObj.UploadId
      }
-     console.log(params.MultipartUpload.Parts)
+    // console.log(params.MultipartUpload.Parts)
      s3.completeMultipartUpload(params, function(err, data) {
           if (err) console.log(err, err.stack); // an error occurred
-          else     console.log(data);           // successful response
+          else{   
+               //  console.log(data);           // successful response
+               console.log(data.Key + 'uploaded succesfully')
+          }
           /*
           data = {
           Bucket: "acexamplebucket", 
