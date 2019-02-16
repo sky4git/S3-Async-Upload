@@ -3,7 +3,7 @@
 *  AWS_SECRET_ACCESS_KEY = <YOUR SECRET ACCESS KEY>
 *  AWS_SESSION_TOKEN (optional)
 *  Run this file with following command
-*  AWS_ACCESS_KEY_ID = <your_access_key_id> AWS_SECRET_ACCESS_KEY = <your_secret_access_key> node index.js YOUR_BUCKET_NAME YOUR_FOLDER_NAME STORAGE_CLASS
+*  AWS_ACCESS_KEY_ID = <your_access_key_id> AWS_SECRET_ACCESS_KEY = <your_secret_access_key> node index.js YOUR_BUCKET_NAME YOUR_FOLDER_NAME STORAGE_CLASS S3_FOLDER_NAME
 *
 *  @ref: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/S3.html
 */
@@ -12,7 +12,8 @@ const AWS = require('aws-sdk')
 const fs = require('fs')
 const path = require('path');
 const EventEmitter = require('events');
-var AssociativeArray = require('associative-array');
+const AssociativeArray = require('associative-array');
+
 
 const customEmitter = new EventEmitter();
 // bucket you want the files to be uploaded
@@ -24,10 +25,14 @@ var ext = '.' + process.argv[4]
 // set storage class
 var StorageClass = process.argv[5];
 
+
 // set empty total parts collector object
 var totalPartsCollector = {};
 // set empty data collector array
 var dataCollectorArr = new AssociativeArray();
+
+// set S3 foldername
+var s3Folder = process.argv[6];
 
 // Set the region 
 AWS.config.update( { region: 'ap-southeast-2' } );
@@ -35,8 +40,43 @@ AWS.config.update( { region: 'ap-southeast-2' } );
 // get the S3 object
 var s3 = new AWS.S3( { apiVersion: '2006-03-01' } );
 
+// check if we have foldername in argument
+if( s3Folder ){
+     // add forward slash to  foldername
+     s3Folder = s3Folder + "/";
+     //call the function to create folder
+     createFolder(s3Folder);
+}
+
+
 console.log('BUCKET = '+bucket)
 console.log('DIRECTORY = '+ folder)
+console.log('FOLDER ='+s3Folder )
+
+/**
+ * create new folder in bucket if folder parameter has passed
+ * @param s3Folder foldername
+ */
+function createFolder(s3Folder){
+
+     s3.putObject({ Body: '', Bucket: bucket, StorageClass: StorageClass, Key: s3Folder }, function(err, data) {
+          if (err) console.log(err, err.stack); // an error occurred
+          else{
+               //console.log(data);           // successful response
+               console.log(s3Folder + " uploaded succesfully");
+          }
+          /*
+          data = {
+          ETag: "\"6805f2cfc46c0f04559748bb039d69ae\"", 
+          VersionId: "tpf3zF08nBplQK1XLOefGskR7mGDwcDk"
+          }
+          */
+     }).on('httpUploadProgress',function (progress) {
+          // Log Progress Information
+          console.log(Math.round(progress.loaded / progress.total * 100) + '% done');
+     });
+}//end func
+
 
 s3.listObjectsV2({ MaxKeys: 10, Bucket: bucket }, function(err, data) {
      if (err) console.log(err, err.stack); // an error occurred
@@ -51,31 +91,36 @@ fs.readdir( folder, { encoding: 'utf-8', withFileTypes: true}, (err, files) => {
     // if error
     if(err) return console.error(err)
 
+    var fileCount = 0;
     files.forEach( function(dirent){
         // double check that it is a file
        if( dirent.isFile() ){
           // check the extension param 
           if( path.extname(dirent.name) === ext || ext === '.' ){
               //console.log(folder + "/" +dirent.name)
-               
+              // inclrease file count
+              fileCount = fileCount + 1;
+              // get more info
               fs.stat( folder + "/" +dirent.name, function(err, stats,) {
                     //console.log("fs.stats file size  : " + stats.size )
                     // if file size is less than 5mb
-                    if( stats.size < 5000000 ){
+                   /*  if( stats.size < 5000000 ){
                          fs.readFile( folder+"/"+dirent.name, (err, data) => {
                               if (err) throw err;
                               //console.log(data);
                               // upload file
                               uploadFile( data, dirent.name )
                          });
-                    }else{
+                    }else{ */
                          // create multipart fileupload
                          createMultiPartUpload( folder+"/"+dirent.name, dirent.name );
-                    }
+                    //}
               })
           }
        }
-    })
+    })// end foreach
+
+    console.log('Total files to upload: '+ fileCount);
 
 });
 
@@ -87,7 +132,7 @@ function uploadFile( filedata, filename ){
      var params = {
           Body: filedata, 
           Bucket: bucket, 
-          Key: filename,
+          Key: s3Folder + filename,
           StorageClass: StorageClass
      };
      s3.putObject(params, function(err, data) {
@@ -102,6 +147,9 @@ function uploadFile( filedata, filename ){
           VersionId: "tpf3zF08nBplQK1XLOefGskR7mGDwcDk"
           }
           */
+     }).on('httpUploadProgress',function (progress) {
+          // Log Progress Information
+          console.log(Math.round(progress.loaded / progress.total * 100) + '% done');
      });
 }
 
@@ -286,7 +334,7 @@ function finishMultiPartUpload( dataObj ) {
           if (err) console.log(err, err.stack); // an error occurred
           else{   
                //  console.log(data);           // successful response
-               console.log(data.Key + 'uploaded succesfully')
+               console.log(data.Key + ' - UPLOADED SUCCESSFULLY')
           }
           /*
           data = {

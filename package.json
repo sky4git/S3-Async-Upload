@@ -15,8 +15,8 @@
   "author": "Aakash D",
   "license": "MIT",
   "dependencies": {
-    "aws-sdk": "^2.350.0",
-    "uuid": "^3.3.2"
+    "aws-sdk": "^2.395.0",
+    "prompt": "^1.0.0"
   },
   "devDependencies": {
     "associative-array": "^1.0.2"
