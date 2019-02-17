@@ -14,25 +14,39 @@ const path = require('path');
 const EventEmitter = require('events');
 const AssociativeArray = require('associative-array');
 
-
+// define new custom emitter
 const customEmitter = new EventEmitter();
+
 // bucket you want the files to be uploaded
 var bucket = process.argv[2]
+if( typeof bucket === 'undefined' || bucket === '' ){
+     console.log('Please provide the bucket name to upload.');
+     return;
+}
+console.log('BUCKET = '+bucket)
+
 // folder from which you want to sync files
 var folder = process.argv[3]
-var ext = '.' + process.argv[4]
+if( typeof folder === 'undefined' || folder === '' ){
+     console.log('Please provide local folder path.');
+     return;
+}
+console.log('DIRECTORY = '+ folder)
+
+// check the extension argument
+var ext =  process.argv[4]
+// check if extension is not *
+if( typeof ext !== 'undefined' && ext !== '' && ext !== '.' ){   ext = '.'+ ext;   }else{ ext = '.'; }
+console.log('EXTENSION ='+ext);
 
 // set storage class
-var StorageClass = process.argv[5];
-
-
+var StorageClass = ( (process.argv[5]) ? process.argv[5] : 'GLACIER' );
+console.log('StorageClass ='+StorageClass);
 // set empty total parts collector object
 var totalPartsCollector = {};
+
 // set empty data collector array
 var dataCollectorArr = new AssociativeArray();
-
-// set S3 foldername
-var s3Folder = process.argv[6];
 
 // Set the region 
 AWS.config.update( { region: 'ap-southeast-2' } );
@@ -40,18 +54,19 @@ AWS.config.update( { region: 'ap-southeast-2' } );
 // get the S3 object
 var s3 = new AWS.S3( { apiVersion: '2006-03-01' } );
 
+// set S3 foldername
+var s3Folder = process.argv[6];
 // check if we have foldername in argument
 if( s3Folder ){
+     console.log('FOLDER ='+s3Folder )
      // add forward slash to  foldername
      s3Folder = s3Folder + "/";
-     //call the function to create folder
+     //call the function to create the folder
      createFolder(s3Folder);
-}
+}else{
+     s3Folder = '';
+}// end if
 
-
-console.log('BUCKET = '+bucket)
-console.log('DIRECTORY = '+ folder)
-console.log('FOLDER ='+s3Folder )
 
 /**
  * create new folder in bucket if folder parameter has passed
@@ -63,7 +78,7 @@ function createFolder(s3Folder){
           if (err) console.log(err, err.stack); // an error occurred
           else{
                //console.log(data);           // successful response
-               console.log(s3Folder + " uploaded succesfully");
+               console.log(s3Folder + " - FOLDER CREATED SUCCESSFULLY");
           }
           /*
           data = {
@@ -71,20 +86,20 @@ function createFolder(s3Folder){
           VersionId: "tpf3zF08nBplQK1XLOefGskR7mGDwcDk"
           }
           */
-     }).on('httpUploadProgress',function (progress) {
+     })/*.on('httpUploadProgress',function (progress) {
           // Log Progress Information
           console.log(Math.round(progress.loaded / progress.total * 100) + '% done');
-     });
+     });*/
 }//end func
 
-
-s3.listObjectsV2({ MaxKeys: 10, Bucket: bucket }, function(err, data) {
+// list current objects
+/* s3.listObjectsV2({ MaxKeys: 10, Bucket: bucket }, function(err, data) {
      if (err) console.log(err, err.stack); // an error occurred
      else{
           //console.log(data);           // successful response
      }
-});
-// console.log(s3)
+}); */
+
 
 // loop through the directory
 fs.readdir( folder, { encoding: 'utf-8', withFileTypes: true}, (err, files) => {
@@ -97,7 +112,7 @@ fs.readdir( folder, { encoding: 'utf-8', withFileTypes: true}, (err, files) => {
        if( dirent.isFile() ){
           // check the extension param 
           if( path.extname(dirent.name) === ext || ext === '.' ){
-              //console.log(folder + "/" +dirent.name)
+              console.log(folder + "/" +dirent.name)
               // inclrease file count
               fileCount = fileCount + 1;
               // get more info
@@ -112,8 +127,8 @@ fs.readdir( folder, { encoding: 'utf-8', withFileTypes: true}, (err, files) => {
                               uploadFile( data, dirent.name )
                          });
                     }else{ */
-                         // create multipart fileupload
-                         createMultiPartUpload( folder+"/"+dirent.name, dirent.name );
+                         // create multipart fileupload - ALWAYS
+                        createMultiPartUpload( folder+"/"+dirent.name, dirent.name );
                     //}
               })
           }
@@ -162,7 +177,7 @@ function createMultiPartUpload( filepath, filename ){
    //set params
    var params = {
         Bucket: bucket, // put
-        Key: filename, // filename is the key
+        Key: s3Folder + filename, // filename is the key
       //  ACL: "private",
         ServerSideEncryption: 'AES256',
         StorageClass: StorageClass
